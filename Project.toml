@@ -1,0 +1,7 @@
+name = "EventStreamMatrix"
+uuid = "ce1006d9-cdbc-48b8-a20b-9e2022e5b95d"
+authors = ["Gray Stanton <gray@graystanton.com>"]
+version = "0.1.0"
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
