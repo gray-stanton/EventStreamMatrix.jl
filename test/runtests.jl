@@ -1,4 +1,5 @@
 using EventStreamMatrix
+using LinearAlgebra
 using Test
 
 @testset "All tests" begin
@@ -76,7 +77,7 @@ using Test
         end
     end
 
-    @testset BSplineEventStreamMatrix begin
+    @testset "BSplineEventStreamMatrix" begin
         eventtimes1 = [0.1, 0.6, 1.0, 1.25]
         labs1 = ["a", "a", "a", "a"]
         labs2 = ["a", "b", "a", "b"]
@@ -88,13 +89,13 @@ using Test
         maxtime = 1.5
         splineorder = 2
         breakpoints = [0.0, 0.01, 0.05, 0.1, 0.2]
+        E1 = FirstOrderBSplineEventStreamMatrix(events1, labels1, δ, maxtime, splineorder, breakpoints)
+        E2 = FirstOrderBSplineEventStreamMatrix(events2, labels2, δ, maxtime, splineorder, breakpoints)
         @testset "Construction" begin
-            E1 = FirstOrderBSplineEventStreamMatrix(events1, labels1, δ, maxtime, splineorder, breakpoints)
-            E2 = FirstOrderBSplineEventStreamMatrix(events2, labels2, δ, maxtime, splineorder, breakpoints)
-            @test E1.ncols = 5
-            @test E2.ncols = 10
+            @test E1.ncols == 5
+            @test E2.ncols == 10
             @test length(E2.basis) == 5
-            @test E1.memory == 0.05
+            @test E1.memory == 0.2
         end
         @testset "Interface" begin
             @test size(E1) == (15, 5)
@@ -102,14 +103,30 @@ using Test
             @test getindex(E1, 2, 1) == 0.0
             @test getindex(E1, 2, 3) >= 0.9999
             @test getindex(E2, 7, 3) == 0.0
-            @test Matrix(E1)[2, 3] - getindex(E1, 2, 3)  <= 0.0001
+            @test (Matrix(E1)[2, 3] - getindex(E1, 2, 3)) <= 0.0001
         end
 
         @testset "Multiplication" begin
-            y = 1.0:15.0
-            b = 1.0:5.0
-            W1 = 5.0:-1.0:1.0
-            W2 = 1.0:15.0
+            y = collect(1.0:15.0)
+            b = collect(1.0:5.0)
+            W1 = collect(5.0:-1.0:1.0)
+            W2 = collect(1.0:15.0)
+            G = WeightedGramMatrix(E1, W2)
+            E3 = FirstOrderBSplineEventStreamMatrix(collect(zip(eventtimes, repeat(["a"], 100))),
+                 ["a"], 0.01, 1.0, 4, [0.0, 0.01, 0.02, 0.03, 0.04, 0.05])
+            E4 = FirstOrderBSplineEventStreamMatrix(collect(zip(eventtimes, repeat(["a", "b"], 50))),
+                 ["a", "b"], 0.01, 1.0, 4, [0.0, 0.01, 0.02, 0.03, 0.04, 0.05])
+            ws = zeros(5)
+            W3 = rand(Float64, 100)
+            @test abs(sum((Matrix(E1) * (W1 .* b)) - XWb(E1, W1, b))) <= 0.0001
+            @test abs(sum(Matrix(E1)' * (W2 .* y)) - XtWy(E1, E2, y)) <= 0.0001
+            @test abs(sum(Matrix(E1)' * diagm(W2) * Matrix(E1))) <= 0.0001
+            @test abs(sum(Matrix(E1)' * diagm(W2) * Matrix(E1) * b)) <= 0.0001
+            @test sum(abs.(Matrix(E3)'* Matrix(E3) - XtWX(E3, ones(E3.nbins)))) <= 0.0001
+            @test sum(abs.(Matrix(E4)'* Matrix(E4) - XtWX(E4, ones(E4.nbins)))) <= 0.0001
+            @test sum(abs.(Matrix(E4)' * Matrix(E4))*collect(1:16.0) - XtWXb(E4, ones(E4.nbins), collect(1:16))) <= 0.0001
+            @test sum(abs.(Matrix(E4)'*diagm(W3) * Matrix(E4) - XtWX(E4, W3))) <= 0.0001
+            @test sum(abs.(Matrix(E4)'*diagm(W3) * Matrix(E4)*collect(1:16.0) - XtWXb(E4, W3, collect(1:16.0)))) <= 0.0001
         end
     end
 end

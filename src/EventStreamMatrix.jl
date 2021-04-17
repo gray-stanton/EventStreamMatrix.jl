@@ -5,16 +5,23 @@ export nextbinmid, prevbinmid
 export whichbin
 export FirstOrderBSplineEventStreamMatrix
 export IdentityEventStreamMatrix, IdentityEventStreamVector
+export WeightedGramMatrix
+export duration, fineness, events
+export zeros, size, getindex, setindex!, length, findall
+export Matrix, Array, Vector
+export XtWX, XtWXb, XtWy, XWb
+export mul!
 
-import Base: findall, size, getindex, setindex!, length, zeros
+import Base: findall, size, getindex, setindex!, length, zeros, Matrix, Array, Vector
 import SparseArrays: findnz
+import LinearAlgebra: mul!
 
 using LinearAlgebra
 using BSplines
 
 abstract type AbstractEventStreamMatrix{T, S} <: AbstractMatrix{T} end
 abstract type AbstractEventStreamVector{T} <: AbstractVector{T} end
-greet() = "Hell"
+greet() = "Hellp"
 
 include("utils.jl")
 include("IdentityEventStreamMatrix.jl")

@@ -17,7 +17,7 @@ struct IdentityEventStreamMatrix{T <: Real, L} <: AbstractEventStreamMatrix{T, L
     nbins :: Int
     ncols :: Int
     IdentityEventStreamMatrix(eventstream, labels, δ, maxtime) = new{typeof(δ), eltype(labels)}(
-        events,
+        eventstream,
         labels,
         δ, 
         maxtime, 
