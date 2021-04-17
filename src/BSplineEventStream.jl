@@ -205,7 +205,7 @@ end
 
 
 
-function convolve(A :: BSplineEventStreamMatrix{T, S}, β :: Vector{T},  δ :: T) where {T <: Real, S <: AbstractVector{T}}
+#= function convolve(A :: BSplineEventStreamMatrix{T, S}, β :: Vector{T},  δ :: T) where {T <: Real, S <: AbstractVector{T}}
     nbins = ceil(Int, A.maxtime/δ)
     dest = zeros(T, nbins)
     return convolve!(dest, A, β, δ)
@@ -230,7 +230,7 @@ function convolve!(dest :: Vector{T}, A :: BSplineEventStreamMatrix{T, S}, β ::
     end
     return dest
 end
-
+ =#
 
 
 
