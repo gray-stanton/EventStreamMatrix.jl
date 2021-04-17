@@ -1,8 +1,42 @@
 # This file is machine-generated - editing it directly is not advised
 
+[[Adapt]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "ffcfa2d345aaee0ef3d8346a073d5dd03c983ebe"
+uuid = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
+version = "3.2.0"
+
+[[BSplines]]
+deps = ["LinearAlgebra", "OffsetArrays", "RecipesBase"]
+git-tree-sha1 = "6265cc152b24f92ea8038b8b18bea8ac3a9674eb"
+uuid = "488c2830-172b-11e9-1591-253b8a7df96d"
+version = "0.3.1"
+
 [[Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 
 [[LinearAlgebra]]
 deps = ["Libdl"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+
+[[OffsetArrays]]
+deps = ["Adapt"]
+git-tree-sha1 = "b3dfef5f2be7d7eb0e782ba9146a5271ee426e90"
+uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+version = "1.6.2"
+
+[[Random]]
+deps = ["Serialization"]
+uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
+[[RecipesBase]]
+git-tree-sha1 = "b3fb709f3c97bfc6e948be68beeecb55a0b340ae"
+uuid = "3cdcf5f2-1ef4-517c-9805-6587b60abb01"
+version = "1.1.1"
+
+[[Serialization]]
+uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
+[[SparseArrays]]
+deps = ["LinearAlgebra", "Random"]
+uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
