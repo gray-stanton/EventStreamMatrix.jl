@@ -105,59 +105,101 @@ function XWb!(ws :: Vector{T}, E :: FirstOrderBSplineEventStreamMatrix{T}, W :: 
     nsplines = length(E.basis)
     fo_splines = [Spline(E.basis, W[k:k+nsplines-1].*b[k:(k+nsplines-1)])  for k in 1:nsplines:(E.ncols)]
     label_order = Dict(l => i for (i, l) in enumerate(E.labels))
-    ws = zeros(eltype(b), order(E.basis))
+    bs_ws = zeros(eltype(b), order(E.basis))
     for (t, l) in events(E)
         i = label_order[l]
         firstpoint = nextbinmid(t, E.δ)
         lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
         points = (firstpoint:E.δ:lastpoint) .- t
         # Broadcast over points
-        update_vec = fo_splines[i].(points; workspace=ws)
+        update_vec = fo_splines[i].(points; workspace=bs_ws)
         update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
-        out[update_bins] += update_vec
+        ws[update_bins] += update_vec
     end
-    return out
 end
 
 function XWb(E :: FirstOrderBSplineEventStreamMatrix{T}, W:: Vector{T}, b :: Vector{T}) where T
     out = zeros(eltype(b), E.nbins)
-    nsplines = length(E.basis)
-    fo_splines = [Spline(E.basis, W[k:k+nsplines-1].*b[k:(k+nsplines-1)])  for k in 1:nsplines:(E.ncols)]
-    label_order = Dict(l => i for (i, l) in enumerate(E.labels))
-    ws = zeros(eltype(b), order(E.basis))
-    for (t, l) in events(E)
-        i = label_order[l]
-        firstpoint = nextbinmid(t, E.δ)
-        lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
-        points = (firstpoint:E.δ:lastpoint) .- t
-        # Broadcast over points
-        update_vec = fo_splines[i].(points; workspace=ws)
-        update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
-        out[update_bins] += update_vec
-    end
+    XWb!(out, E, W, b)
     return out
 end
 
-
-#TODO: Write all of these without allocations, overwriting!
-function XtWy(E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{T}) where T
-    out = zeros(eltype(y), E.ncols)
+function XtWy!(dest, E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{T}) where T
+    if length(dest) != E.ncols
+        throw(DimensionMismatch())
+    end
     nsplines = length(E.basis)
     label_order = Dict(l => i for (i, l) in enumerate(E.labels))
     starts = 1:nsplines:(E.ncols)
+    # allocate up to maximum possible number of points
+    basmat_ws = zeros(eltype(y), length(whichbin(0.0, E.δ):E.δ:whichbin(E.memory, E.δ)), nsplines)
     for (t, l) in events(E)
         i = label_order[l]
         firstpoint = nextbinmid(t, E.δ)
         lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
         points = (firstpoint:E.δ:lastpoint) .- t
-        bmat = basismatrix(E.basis, points)
+        basmat_view = view(basmat_ws, 1:length(points), :)
+        basismatrix!(basmat_view, E.basis, points)
         update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
         relW = W[update_bins]
         rely = y[update_bins]
-        update_vec = transpose(bmat) * (relW .* rely)
-        out[starts[i]:(starts[i] +nsplines -1)] += update_vec
+        update_vec = transpose(basmat_view) * (relW .* rely)
+        dest[starts[i]:(starts[i] +nsplines -1)] += update_vec
     end
-    return out
+    return dest
+end
+
+function XtWy(E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{T}) where T
+    dest = zeros(eltype(y), E.ncols)
+    return XtWy!(dest, E, W, y)
+end
+
+function XtWX!(dest, E, W)
+    label_order = Dict(l => i for (i, l) in enumerate(E.labels))
+    nsplines = length(E.basis)
+    starts = 1:nsplines:(E.ncols)
+    basmat_ws1 = zeros(eltype(y), length(whichbin(0.0, E.δ):E.δ:whichbin(E.memory, E.δ)), nsplines)
+    basmat_ws2 = zeros(eltype(y), length(whichbin(0.0, E.δ):E.δ:whichbin(E.memory, E.δ)), nsplines)
+    for (j, (t1, l1)) in enumerate(events(E))
+        self_mult = true # first case is always self, handle differently.
+        for (t2, l2) in events(E)[j:end]
+            if t2 > t1 + E.memory
+                break
+            else
+                i1 = label_order[l1]
+                i2 = label_order[l2]
+                firstpoint = max(nextbinmid(t1, E.δ), nextbinmid(t2, E.δ))
+                lastpoint = min(prevbinmid(t1 + E.memory, E.δ),  prevbinmid(E.maxtime, E.δ))
+                points_for_t1 = (firstpoint:E.δ:lastpoint) .- t1
+                points_for_t2 = (firstpoint:E.δ:lastpoint) .- t2
+                bmat_for_t1 = view(basmat_ws1, 1:length(points_for_t1), :)
+                bmat_for_t2 = view(basmat_ws2, 1:length(points_for_t2), :)
+
+                basismatrix!(bmat_for_t1, E.basis, points_for_t1)
+                basismatrix!(bmat_for_t2, E.basis, points_for_t2)
+                update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
+                relW = W[update_bins]
+                # This is the "above" diagonal block, hence want the smaller of the two to transpose
+                update_mat1 = bmat_for_t1' * diagm(relW) * bmat_for_t2 # TODO: Make this into a view as well.
+                update_mat2 = transpose(update_mat1)
+                # Symmetric, update both blocks
+                # If same event, only update once. Otherwise there are two contributions.
+                if i1 == i2
+                    dest[starts[i1]:(starts[i1]+nsplines-1), starts[i2]:(starts[i2] + nsplines-1)] += update_mat1
+                    if !self_mult
+                        dest[starts[i1]:(starts[i1]+nsplines-1), starts[i1]:(starts[i1] + nsplines-1)] += update_mat2
+                    end
+                else
+                    #k1 = min(i1, i2)
+                    #k2 = max(i1, i2)
+                    dest[starts[i1]:(starts[i1]+nsplines-1), starts[i2]:(starts[i2] + nsplines-1)] += update_mat1
+                    dest[starts[i2]:(starts[i2]+nsplines-1), starts[i1]:(starts[i1] + nsplines-1)] += update_mat2
+                end
+                self_mult = false 
+            end
+        end
+    end
+    return dest
 end
 
 

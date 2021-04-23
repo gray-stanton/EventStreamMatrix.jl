@@ -12,6 +12,8 @@ export Matrix, Array, Vector
 export XtWX, XtWXb, XtWy, XWb
 export mul!
 
+export AbstractEventStreamMatrix, AbstractEventStreamVector
+
 import Base: findall, size, getindex, setindex!, length, zeros, Matrix, Array, Vector
 import SparseArrays: findnz
 import LinearAlgebra: mul!
