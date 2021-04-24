@@ -54,10 +54,6 @@ function getindex(E :: FirstOrderBSplineEventStreamMatrix, I...)
     relspline_num = (I[2] -1) % length(E.basis) + 1
     relspline = E.basis[relspline_num]
     # only spikes in range [reltime - memory, reltime] should be included
-    function memorylengths_away(t, reltime, memory)
-        t == reltime - memory && return 0 # check exact boundary
-        return ceil(Int, (nextfloat(t)-reltime)/memory)
-    end
     binrange = searchsorted(events(E), prevfloat(reltime), by=(tup) -> memorylengths_away(tup[1], reltime, E.memory))
     tdiffs = [reltime - e[1] for e in events(E)[binrange] if e[2] == rellabel]
     out = sum(relspline.(tdiffs))

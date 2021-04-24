@@ -11,6 +11,7 @@ export zeros, size, getindex, setindex!, length, findall
 export Matrix, Array, Vector
 export XtWX, XtWXb, XtWy, XWb
 export mul!
+export memorylengths_away
 
 export AbstractEventStreamMatrix, AbstractEventStreamVector
 

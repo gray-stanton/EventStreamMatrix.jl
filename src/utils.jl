@@ -1,4 +1,8 @@
 
+function memorylengths_away(t, reltime, memory)
+    t == reltime - memory && return 0 # check exact boundary
+    return ceil(Int, (nextfloat(t)-reltime)/memory)
+end
 
 function binstart(i, δ)
     i == 1 && return zero(typeof(δ))
