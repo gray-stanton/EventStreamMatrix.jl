@@ -10,6 +10,7 @@ export duration, fineness, events
 export zeros, size, getindex, setindex!, length, findall
 export Matrix, Array, Vector
 export XtWX, XtWXb, XtWy, XWb
+export XWb!, XtWy!, XtWX!, XtWXb!
 export mul!
 export memorylengths_away
 

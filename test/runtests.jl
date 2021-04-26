@@ -39,7 +39,7 @@ using Test
             @test duration(E1) == 5.0
             @test fineness(E1) == 0.5
             @test events(E1) == eventtimes
-            @test events(zeroes(IdentityEventStreamVector, 1.0, 10.0)) == Float64[]
+            @test events(zeros(IdentityEventStreamVector, 1.0, 10.0)) == Float64[]
         end
         @testset "Conversion" begin
             binned_events = [0, 0, 0, 1, 0, 1, 2, 0, 1, 0]
@@ -66,9 +66,9 @@ using Test
         @testset "Creation" begin
             E2 = IdentityEventStreamMatrix(eventstream, δ, maxtime)
             E3 = IdentityEventStreamMatrix(eventstream, δ)
-            @test labels(E1) == labels(E2)
-            @test duration(E2) == 4.5
-            @test ncols(E1) == 2
+            #@test labels(E1) == labels(E2)
+            @test duration(E2) == 5.0
+            @test size(E1)[2] == 2
         end
 
         @testset "Conversion" begin
@@ -112,6 +112,7 @@ using Test
             W1 = collect(5.0:-1.0:1.0)
             W2 = collect(1.0:15.0)
             G = WeightedGramMatrix(E1, W2)
+            eventtimes = sort(rand(Float64, 100))
             E3 = FirstOrderBSplineEventStreamMatrix(collect(zip(eventtimes, repeat(["a"], 100))),
                  ["a"], 0.01, 1.0, 4, [0.0, 0.01, 0.02, 0.03, 0.04, 0.05])
             E4 = FirstOrderBSplineEventStreamMatrix(collect(zip(eventtimes, repeat(["a", "b"], 50))),
@@ -119,12 +120,12 @@ using Test
             ws = zeros(5)
             W3 = rand(Float64, 100)
             @test abs(sum((Matrix(E1) * (W1 .* b)) - XWb(E1, W1, b))) <= 0.0001
-            @test abs(sum(Matrix(E1)' * (W2 .* y)) - XtWy(E1, E2, y)) <= 0.0001
+            @test abs(sum(Matrix(E1)' * (W2 .* y) - XtWy(E1, W2, y))) <= 0.0001
             @test abs(sum(Matrix(E1)' * diagm(W2) * Matrix(E1))) <= 0.0001
             @test abs(sum(Matrix(E1)' * diagm(W2) * Matrix(E1) * b)) <= 0.0001
             @test sum(abs.(Matrix(E3)'* Matrix(E3) - XtWX(E3, ones(E3.nbins)))) <= 0.0001
             @test sum(abs.(Matrix(E4)'* Matrix(E4) - XtWX(E4, ones(E4.nbins)))) <= 0.0001
-            @test sum(abs.(Matrix(E4)' * Matrix(E4))*collect(1:16.0) - XtWXb(E4, ones(E4.nbins), collect(1:16))) <= 0.0001
+            @test sum(abs.(Matrix(E4)' * Matrix(E4))*collect(1:16.0) - XtWXb(E4, ones(E4.nbins), collect(1:16.0))) <= 0.0001
             @test sum(abs.(Matrix(E4)'*diagm(W3) * Matrix(E4) - XtWX(E4, W3))) <= 0.0001
             @test sum(abs.(Matrix(E4)'*diagm(W3) * Matrix(E4)*collect(1:16.0) - XtWXb(E4, W3, collect(1:16.0)))) <= 0.0001
         end
