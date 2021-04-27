@@ -106,11 +106,12 @@ function XWb!(dest :: Vector{T}, E :: FirstOrderBSplineEventStreamMatrix{T}, W :
     label_order = Dict(l => i for (i, l) in enumerate(E.labels))
     bs_ws = zeros(eltype(b), order(E.basis))
     dest[:] .= zero(eltype(dest)) # Zero out dest
+    points_ws = 
     for (t, l) in events(E)
         i = label_order[l]
         firstpoint = nextbinmid(t, E.δ)
         lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
-        points = (firstpoint:E.δ:lastpoint) .- t
+        points = ((firstpoint-t):E.δ:(lastpoint - t))
         # Broadcast over points
         update_vec = fo_splines[i].(points; workspace=bs_ws)
         update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
@@ -182,13 +183,12 @@ function XtWX!(dest, E, W)
                 points_for_t2 = (firstpoint:E.δ:lastpoint) .- t2
                 bmat_for_t1 = view(basmat_ws1, 1:length(points_for_t1), :)
                 bmat_for_t2 = view(basmat_ws2, 1:length(points_for_t2), :)
-
                 basismatrix!(bmat_for_t1, E.basis, points_for_t1)
                 basismatrix!(bmat_for_t2, E.basis, points_for_t2)
                 update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
                 relW = W[update_bins]
                 # This is the "above" diagonal block, hence want the smaller of the two to transpose
-                update_mat1 = bmat_for_t1' * diagm(relW) * bmat_for_t2 # TODO: Make this into a view as well.
+                update_mat1 = bmat_for_t1' * Diagonal(relW) * bmat_for_t2 # TODO: Make this into a view as well.
                 update_mat2 = transpose(update_mat1)
                 # Symmetric, update both blocks
                 # If same event, only update once. Otherwise there are two contributions.
