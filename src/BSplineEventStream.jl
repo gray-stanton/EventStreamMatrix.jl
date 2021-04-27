@@ -226,9 +226,9 @@ function XtWXb!(dest, E :: FirstOrderBSplineEventStreamMatrix, W, b ::Vector{T})
     # stopgap implementation as XtW(XB)
     if length(dest) != size(E)[2]
         throw(DimensionMismatch())
-    else if length(b) != size(E)[2]
+    elseif length(b) != size(E)[2]
         throw(DimensionMismatch())
-    else if length(W) != size(E)[1]
+    elseif length(W) != size(E)[1]
         throw(DimensionMismatch())
     else
         xb = XWb(E, ones(size(E)[2]), b)
