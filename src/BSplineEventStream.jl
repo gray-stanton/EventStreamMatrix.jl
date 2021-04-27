@@ -115,7 +115,7 @@ function XWb!(dest :: Vector{T}, E :: FirstOrderBSplineEventStreamMatrix{T}, W :
         # Broadcast over points
         update_vec = fo_splines[i].(points; workspace=bs_ws)
         update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
-        dest[update_bins += update_vec
+        dest[update_bins] += update_vec
     end
     return dest
 end
