@@ -245,21 +245,27 @@ function XtWXb!(dest , E::FirstOrderBSplineEventStreamMatrix, W, b::Vector{T}) w
                 bmat_for_t2 = basismatrix(E.basis, points_for_t2)
                 update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
                 relW = W[update_bins]
-                update_mat1 = bmat_for_t1' * diagm(relW) * bmat_for_t2 
-                update_mat2 = transpose(update_mat1)
                 relb1 = b[starts[i1]:(starts[i1] + nsplines -1)]
                 relb2 = b[starts[i2]:(starts[i2] + nsplines -1)]
+                B2beta = bmat_for_t2 * relb2
+                B1beta = bmat_for_t1 * relb1
+                #update_mat1 = bmat_for_t1' * Diagonal(relW) * bmat_for_t2 
+                #update_mat2 = transpose(update_mat1)
                 #update_vec1 = update_mat * b[starts[i1]:(starts[i1] + nsplines -1)]
                 #update_vec2 = transpose(update_mat) * b[starts[i2]:(starts[i2] + nsplines -1)]
+                #beta_up1 = update_mat1 * relb2
+                beta_up1 = bmat_for_t1'*Diagonal(relW)*B2beta
+                beta_up2 = bmat_for_t2'*Diagonal(relW)*B1beta
+                #beta_up2 = update_mat2 * relb1
                 if i1 == i2
-                    dest[starts[i1]:(starts[i1] + nsplines -1)] += update_mat1 * relb2
+                    dest[starts[i1]:(starts[i1] + nsplines -1)] += beta_up1
                     if !self_mult
-                        dest[starts[i1]:(starts[i1] +nsplines -1)] += update_mat2 * relb1
+                        dest[starts[i1]:(starts[i1] +nsplines -1)] += beta_up2
                     end
                 else
                     # Avoid double-counting 
-                    dest[starts[i1]:(starts[i1] + nsplines -1)] += update_mat1 * relb2
-                    dest[starts[i2]:(starts[i2] + nsplines -1)] += update_mat2 * relb1
+                    dest[starts[i1]:(starts[i1] + nsplines -1)] += beta_up1
+                    dest[starts[i2]:(starts[i2] + nsplines -1)] += beta_up2
                 end
                 self_mult = false
             end
