@@ -158,6 +158,11 @@ function XtWy(E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{T}) whe
 end
 
 function XtWX!(dest, E, W)
+    #stopgap no-op. Implement my bounded memory dequeue idea to avoid quadratic scaling in nspikes
+    return dest
+end
+
+function XtWX!_old(dest, E, W)
     if size(dest) != (E.ncols, E.ncols)
         throw(DimensionMismatch())
     elseif length(W) != E.nbins
@@ -217,9 +222,22 @@ function XtWX(E:: FirstOrderBSplineEventStreamMatrix, W=ones(E.nbins))
     return out
 end
 
+function XtWXb!(dest, E :: FirstOrderBSplineEventStreamMatrix, W, b ::Vector{T}) where T
+    # stopgap implementation as XtW(XB)
+    if length(dest) != size(E)[2]
+        throw(DimensionMismatch())
+    else if length(b) != size(E)[2]
+        throw(DimensionMismatch())
+    else if length(W) != size(E)[1]
+        throw(DimensionMismatch())
+    else
+        xb = XWb(E, ones(size(E)[2]), b)
+        XtWy!(dest, E, W, xb)
+        return dest
+    end
+end
 
-
-function XtWXb!(dest , E::FirstOrderBSplineEventStreamMatrix, W, b::Vector{T}) where T
+function XtWXb!_old(dest , E::FirstOrderBSplineEventStreamMatrix, W, b::Vector{T}) where T
     if length(dest) != E.ncols
         throw(DimensionMismatch())
     elseif length(W) != E.nbins
