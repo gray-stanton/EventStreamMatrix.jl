@@ -111,11 +111,11 @@ function XWb!(dest :: Vector{T}, E :: FirstOrderBSplineEventStreamMatrix{T}, W :
         i = label_order[l]
         firstpoint = nextbinmid(t, E.δ)
         lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
-        points = ((firstpoint-t):E.δ:(lastpoint - t))
+        points = (firstpoint:E.δ:lastpoint) .- t
         # Broadcast over points
         update_vec = fo_splines[i].(points; workspace=bs_ws)
         update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
-        dest[update_bins] += update_vec
+        dest[update_bins += update_vec
     end
     return dest
 end

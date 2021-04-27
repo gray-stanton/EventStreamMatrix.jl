@@ -68,24 +68,28 @@ function main()
     X = Matrix(E)
     S = sparse(X)
     #XWb trials
-    xwb_dense = @benchmark X * W2d * b seconds=args["seconds"]
-    xwb_sparse = @benchmark S * W2d * b seconds=args["seconds"]
-    xwb_event = @benchmark XWb!(dest3, E, W2, b) seconds=args["seconds"]
+    print("XWb trials begin")
+    xwb_dense = @benchmark $X * $W2d * $b seconds=args["seconds"]
+    xwb_sparse = @benchmark $S * $W2d * $b seconds=args["seconds"]
+    xwb_event = @benchmark XWb!($dest1, $E, $W2, $b) seconds=args["seconds"]
 
     #XtWy trials
-    xtwy_dense = @benchmark X' * W1d * y seconds=args["seconds"]
-    xtwy_sparse = @benchmark S' * W1d * y seconds=args["seconds"]
-    xtwy_event = @benchmark XtWy!(dest1, E, W1, y) seconds=args["seconds"]
+    print("XtWy trials begin")
+    xtwy_dense = @benchmark $X' * $W1d * $y seconds=args["seconds"]
+    xtwy_sparse = @benchmark $S' * $W1d * $y seconds=args["seconds"]
+    xtwy_event = @benchmark XtWy!($dest1, $E, $W1, $y) seconds=args["seconds"]
 
     #XtWX trials
-    xtwx_dense = @benchmark X' * W1d * X seconds=args["seconds"]
-    xtwx_sparse = @benchmark S' * W1d * S seconds=args["seconds"]
-    xtwx_event = @benchmark XtWX!(dest3, E, W1) seconds=args["seconds"]
+    print("XtWX trials begin")
+    xtwx_dense = @benchmark $X' * $W1d * $X seconds=args["seconds"]
+    xtwx_sparse = @benchmark $S' * $W1d * $S seconds=args["seconds"]
+    xtwx_event = @benchmark XtWX!($dest3, $E, $W1) seconds=args["seconds"]
 
     # XtWXb trials
-    xtwxb_dense = @benchmark X' * W1d * X * b seconds=args["seconds"]
-    xtwxb_sparse = @benchmark S' * W1d * S * b seconds=args["seconds"]
-    xtwxb_event = @benchmark XtWXb!(dest2, E, W1, b) seconds=args["seconds"]
+    print("XtWXb trials begin")
+    xtwxb_dense = @benchmark $X' * $W1d * $X * $b seconds=args["seconds"]
+    xtwxb_sparse = @benchmark $S' * $W1d * $S * $b seconds=args["seconds"]
+    xtwxb_event = @benchmark XtWXb!($dest2, $E, $W1, $b) seconds=args["seconds"]
 
     names = ["xwb_dense", "xwb_sparse", "xwb_event", "xtwy_dense", "xtwy_sparse", "xtwy_event", "xtwx_dense",
              "xtwx_spase", "xtwx_event", "xtwxb_dense", "xtwxb_sparse", "xtwxb_event"]
