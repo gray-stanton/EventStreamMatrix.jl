@@ -31,6 +31,63 @@ end
 
 size(E :: FirstOrderBSplineEventStreamMatrix) = (E.nbins, E.ncols)
 
+
+
+struct FirstOrderDiscBSplineEventStreamMatrix <: AbstractEventStreamMatrix{Float64, String}
+    events :: Vector{Tuple{Int, Int}}
+    labels :: Vector{String}
+    δ :: Float64
+    maxtime :: Float64
+    nbins :: Int
+    ncols :: Int
+    basis :: BSplineBasis{Vector{Float64}}
+    memory :: Float64
+    membins :: Int
+    expansion :: Matrix{Float64}
+    function FirstOrderDiscBSplineEventStreamMatrix(
+        events,
+        labels,
+        δ,
+        maxtime,
+        splineorder,
+        breakpoints
+    )
+        newbasis = BSplineBasis(splineorder, breakpoints)
+        points = binstart(1, δ):δ:prevbinmid(support(newbasis)[2] + δ/2, δ)
+        expmat = basismatrix(newbasis, points)
+        return new(
+            events,
+            labels,
+            δ,
+            maxtime,
+            ceil(Int, maxtime/δ),
+            length(labels) * length(newbasis),
+            newbasis,
+            support(newbasis)[2],
+            ceil(Int, support(newbasis)[2]/δ)+1,
+            expmat
+        )
+    end
+end
+function FirstOrderDiscBSplineEventStreamMatrix(events::Vector{Tuple{Float64, String}}, labels, δ, maxtime, splineorder, breakpoints)
+    binned_events = [(whichbin(e, δ), findfirst(lab -> lab==l, labels)) for (e, l) in events]
+    return FirstOrderDiscBSplineEventStreamMatrix(binned_events, labels, δ, maxtime, splineorder, breakpoints)
+end
+
+size(E :: FirstOrderDiscBSplineEventStreamMatrix) = (E.nbins, E.ncols)
+setindex(E :: FirstOrderDiscBSplineEventStreamMatrix, I...) = @error "Not implemented"
+function getindex(E :: FirstOrderDiscBSplineEventStreamMatrix, I...)
+    rellabel = E.labels[ceil(Int, I[2]/length(E.basis))]
+    relspline_num = (I[2] -1) % length(E.basis) + 1
+    in_range = searchsorted(E.events, I[1], by= (t) -> ceil(Int, (t[1]- I[1])/E.membins))
+    out = 0.0
+    for (x, l) in E.events[in_range]
+        out += E.expansion[I[1] - x + 1, relspline_num]
+    end
+    return out
+end
+
+
 struct WeightedGramMatrix{T, L} <: AbstractMatrix{T}
     X :: FirstOrderBSplineEventStreamMatrix{T, L}
     W :: Vector{T}
@@ -43,8 +100,8 @@ setindex!(G :: WeightedGramMatrix, I...) = @error "Not implemented"
 getindex(G :: WeightedGramMatrix, I...) = XtWX(G.X, G.W)[I[1], I[2]]
 
 function mul!(ws, G::WeightedGramMatrix, b :: Vector)
-    #ws[:] = XtWXb(G.X, G.W, b)
-    ws[:] = Matrix(G.X)' * diagm(G.W) * Matrix(G.X) * b
+    ws[:] = XtWXb(G.X, G.W, b)
+    #ws[:] = Matrix(G.X)' * diagm(G.W) * Matrix(G.X) * b
 end
 
 function getindex(E :: FirstOrderBSplineEventStreamMatrix, I...)
@@ -57,6 +114,18 @@ function getindex(E :: FirstOrderBSplineEventStreamMatrix, I...)
     binrange = searchsorted(events(E), prevfloat(reltime), by=(tup) -> memorylengths_away(tup[1], reltime, E.memory))
     tdiffs = [reltime - e[1] for e in events(E)[binrange] if e[2] == rellabel]
     out = sum(relspline.(tdiffs))
+    return out
+end
+
+ Array(E :: FirstOrderDiscBSplineEventStreamMatrix) = Matrix(E)
+function Matrix(E :: FirstOrderDiscBSplineEventStreamMatrix)
+    out= zeros(Float64, E.nbins, E.ncols)
+    nsplines = length(E.basis)
+    starts = 1:nsplines:(E.ncols)
+    for (x, l) in E.events
+        update_bins = 1:min(E.membins, E.nbins - x )
+        out[x .+ update_bins, starts[l]:(starts[l]+nsplines-1)] += E.expansion[update_bins, :]
+    end
     return out
 end
 
@@ -97,37 +166,48 @@ function Matrix(E :: FirstOrderBSplineEventStreamMatrix)
 end
 
 
-function XWb!(dest :: Vector{T}, E :: FirstOrderBSplineEventStreamMatrix{T}, W :: Vector{T}, b :: Vector{T}) where T
-    if length(dest) != E.nbins
+function XWb!(dest :: Vector{T}, E :: FirstOrderBSplineEventStreamMatrix{T}, W :: Vector{T}, b :: Vector{T}; intercept=false) where T
+    if length(dest) != E.nbins && !intercept
         throw(DimensionMismatch())
     end
     nsplines = length(E.basis)
     fo_splines = [Spline(E.basis, W[k:k+nsplines-1].*b[k:(k+nsplines-1)])  for k in 1:nsplines:(E.ncols)]
     label_order = Dict(l => i for (i, l) in enumerate(E.labels))
     bs_ws = zeros(eltype(b), order(E.basis))
-    dest[:] .= zero(eltype(dest)) # Zero out dest
-    points_ws = 
+    fill_val = intercept ? W[1] * b[1] : 0.0
+    fill!(dest, fill_val)
+    if intercept
+        b = view(b, 2, length(b))
+    end
     for (t, l) in events(E)
         i = label_order[l]
         firstpoint = nextbinmid(t, E.δ)
         lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
-        points = (firstpoint:E.δ:lastpoint) .- t
+        points = (firstpoint:E.δ:lastpoint)
         # Broadcast over points
-        update_vec = fo_splines[i].(points; workspace=bs_ws)
-        update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
-        dest[update_bins] += update_vec
+        for p in points
+            dest[whichbin(p, E.δ)] = fo_splines[i](p - t, workspace=bs_ws)
+        end
+        #update_vec = fo_splines[i].(points; workspace=bs_ws)
+        #update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
+        #dest[update_bins] += update_vec
     end
     return dest
 end
 
-function XWb(E :: FirstOrderBSplineEventStreamMatrix{T}, W:: Vector{T}, b :: Vector{T}) where T
+
+
+
+
+
+function XWb(E :: FirstOrderBSplineEventStreamMatrix{T}, W:: Vector{T}, b :: Vector{T}; intercept=false) where T
     out = zeros(eltype(b), E.nbins)
-    XWb!(out, E, W, b)
+    XWb!(out, E, W, b; intercept=intercept)
     return out
 end
 
-function XtWy!(dest, E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{T}) where T
-    if length(dest) != E.ncols
+function XtWy!(dest, E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{T}; intercept=false) where T
+    if length(dest) != E.ncols && !intercept
         throw(DimensionMismatch())
     end
     nsplines = length(E.basis)
@@ -136,6 +216,10 @@ function XtWy!(dest, E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{
     # allocate up to maximum possible number of points
     basmat_ws = zeros(eltype(y), length(whichbin(0.0, E.δ):E.δ:whichbin(E.memory, E.δ)), nsplines)
     dest[:] .= zero(eltype(dest))
+    if intercept
+        dest[1] = sum(w .* y)
+        dest = view(dest, 2, length(dest))
+    end
     for (t, l) in events(E)
         i = label_order[l]
         firstpoint = nextbinmid(t, E.δ)
@@ -152,9 +236,9 @@ function XtWy!(dest, E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{
     return dest
 end
 
-function XtWy(E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{T}) where T
+function XtWy(E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{T}; intercept=false) where T
     dest = zeros(eltype(y), E.ncols)
-    return XtWy!(dest, E, W, y)
+    return XtWy!(dest, E, W, y; intercept=intercept)
 end
 
 function XtWX!(dest, E, W)
@@ -216,13 +300,13 @@ function XtWX!_old(dest, E, W)
 end
 
 
-function XtWX(E:: FirstOrderBSplineEventStreamMatrix, W=ones(E.nbins))
+function XtWX(E:: FirstOrderBSplineEventStreamMatrix, W=ones(E.nbins); intercept=false)
     out = zeros(Float64, E.ncols, E.ncols)
     XtWX!(out, E, W)
     return out
 end
 
-function XtWXb!(dest, E :: FirstOrderBSplineEventStreamMatrix, W, b ::Vector{T}) where T
+function XtWXb!(dest, E :: FirstOrderBSplineEventStreamMatrix, W, b ::Vector{T}; intercept=false) where T
     # stopgap implementation as XtW(XB)
     if length(dest) != size(E)[2]
         throw(DimensionMismatch())
@@ -231,8 +315,8 @@ function XtWXb!(dest, E :: FirstOrderBSplineEventStreamMatrix, W, b ::Vector{T})
     elseif length(W) != size(E)[1]
         throw(DimensionMismatch())
     else
-        xb = XWb(E, ones(size(E)[2]), b)
-        XtWy!(dest, E, W, xb)
+        xb = XWb(E, ones(size(E)[2]), b;intercept=intercept)
+        XtWy!(dest, E, W, xb; intercept=intercept)
         return dest
     end
 end
@@ -295,9 +379,9 @@ end
 
 
 
-function XtWXb(E :: FirstOrderBSplineEventStreamMatrix{T}, W, b :: Vector{T}) where T
+function XtWXb(E :: FirstOrderBSplineEventStreamMatrix{T}, W, b :: Vector{T}; intercept=false) where T
     out = zeros(Float64, E.ncols)
-    XtWXb!(out, E, W, b)
+    XtWXb!(out, E, W, b; intercept=intercept)
     return out
 end
 

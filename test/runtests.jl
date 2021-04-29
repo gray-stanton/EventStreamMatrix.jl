@@ -130,5 +130,13 @@ using Test
             @test sum(abs.(Matrix(E4)'*diagm(W3) * Matrix(E4)*collect(1:16.0) - XtWXb(E4, W3, collect(1:16.0)))) <= 0.0001
         end
     end
+
+    @testset "BSplineDiscEventStreamMatrix" begin
+        eventtimes = 100.0 *rand(Float64, 100)
+        labs = repeat(["a", "b"], 50)
+        evns = collect(zip(eventtimes, labs))
+        sort!(events)
+        E = FirstOrderDiscBSplineEventStreamMatrix(evns, ["a", "b"], 0.1, 100.0, 4, [0.0, 2.0, 4.0])
+    end
 end
 
