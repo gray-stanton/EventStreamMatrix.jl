@@ -15,7 +15,7 @@ struct FirstOrderBSplineEventStreamMatrix{T <: Real, L} <: AbstractEventStreamMa
         maxtime,
         splineorder,
         breakpoints,
-        intercept
+        intercept=false
     )
         newbasis = BSplineBasis(splineorder, breakpoints)
         return new{typeof(δ), eltype(labels)}(
