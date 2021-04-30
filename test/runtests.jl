@@ -133,10 +133,10 @@ using Test
 
     @testset "BSplineDiscEventStreamMatrix" begin
         eventtimes = 100.0 *rand(Float64, 100)
-        labs = repeat(["a", "b"], 50)
+        labs = repeat(1:2, 50)
         evns = collect(zip(eventtimes, labs))
         sort!(evns)
-        E = FirstOrderDiscBSplineEventStreamMatrix(evns, ["a", "b"], 0.1, 100.0, 4, [0.0, 2.0, 4.0])
+        E = FirstOrderDiscBSplineEventStreamMatrix(evns, ["a", "b"], 0.1, 100.0, 4, [0.0, 2.0, 4.0], true)
     end
 end
 
