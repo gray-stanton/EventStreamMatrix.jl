@@ -135,7 +135,7 @@ using Test
         eventtimes = 100.0 *rand(Float64, 100)
         labs = repeat(["a", "b"], 50)
         evns = collect(zip(eventtimes, labs))
-        sort!(events)
+        sort!(evns)
         E = FirstOrderDiscBSplineEventStreamMatrix(evns, ["a", "b"], 0.1, 100.0, 4, [0.0, 2.0, 4.0])
     end
 end
