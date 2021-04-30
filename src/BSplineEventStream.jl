@@ -40,9 +40,9 @@ function FirstOrderBSplineEventStreamMatrix(events::Vector{Tuple{Float64, String
     return FirstOrderBSplineEventStreamMatrix(relab_events, labels, δ, maxtime, splineorder, breakpoints, intercept)
 end
 
-function FirstOrderBSplineEventStreamMatrix(events::Vector{Tuple{Float64, Int}}, labels, δ, maxtime, splineorder, breakpoints, intercept)
-    return FirstOrderBSplineEventStreamMatrix{Float64, eltype(labels)}(events, labels, δ, maxtime, splineorder, breakpoints, intercept)
-end
+#function FirstOrderBSplineEventStreamMatrix(events::Vector{Tuple{Float64, Int}}, labels, δ, maxtime, splineorder, breakpoints, intercept)
+#    return FirstOrderBSplineEventStreamMatrix{Float64, eltype(labels)}(events, labels, δ, maxtime, splineorder, breakpoints, intercept)
+#end
 
 size(E :: FirstOrderBSplineEventStreamMatrix) = (E.nbins, E.ncols)
 
@@ -134,13 +134,13 @@ function getindex(E :: FirstOrderBSplineEventStreamMatrix, I...)
         return 1.0 # in intercept column
     end
     col_ind = E.intercept ? I[2] -1 : I[2]
-    rellabel = E.labels[ceil(Int, col_ind/length(E.basis))]
+    rellabelnum = ceil(Int, col_ind/length(E.basis))
     reltime = binmid(bin_ind, fineness(E))
     relspline_num = (col_ind -1) % length(E.basis) + 1
     relspline = E.basis[relspline_num]
     # only spikes in range [reltime - memory, reltime] should be included
     binrange = searchsorted(events(E), prevfloat(reltime), by=(tup) -> memorylengths_away(tup[1], reltime, E.memory))
-    tdiffs = [reltime - e[1] for e in events(E)[binrange] if e[2] == rellabel]
+    tdiffs = [reltime - e[1] for e in events(E)[binrange] if e[2] == rellabelnum]
     out = sum(relspline.(tdiffs))
     return out
 end
@@ -202,26 +202,22 @@ end
 
 function XWb!(dest :: Vector{T}, E :: FirstOrderBSplineEventStreamMatrix{T}, W :: Vector{T}, b :: Vector{T}) where T
     intercept = E.intercept
+    #ncols = E.intercept ? E.ncols - 1 : E.ncols
     if length(dest) != E.nbins && !intercept
         throw(DimensionMismatch())
     end
     nsplines = length(E.basis)
-    fo_splines = [Spline(E.basis, W[k:k+nsplines-1].*b[k:(k+nsplines-1)])  for k in 1:nsplines:(E.ncols)]
-    label_order = Dict(l => i for (i, l) in enumerate(E.labels))
+    fo_splines = [Spline(E.basis, W[k:k+nsplines-1].*b[k:(k+nsplines-1)])  for k in 2:nsplines:(E.ncols)]
     bs_ws = zeros(eltype(b), order(E.basis))
     fill_val = intercept ? W[1] * b[1] : 0.0
     fill!(dest, fill_val)
-    if intercept
-        b = view(b, 2, length(b))
-    end
-    for (t, l) in events(E)
-        i = label_order[l]
+    for (t, i) in events(E)
         firstpoint = nextbinmid(t, E.δ)
         lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
         points = (firstpoint:E.δ:lastpoint)
         # Broadcast over points
         for p in points
-            dest[whichbin(p, E.δ)] = fo_splines[i](p - t, workspace=bs_ws)
+            dest[whichbin(p, E.δ)] += fo_splines[i](p - t, workspace=bs_ws)
         end
         #update_vec = fo_splines[i].(points; workspace=bs_ws)
         #update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
@@ -247,17 +243,15 @@ function XtWy!(dest, E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{
         throw(DimensionMismatch())
     end
     nsplines = length(E.basis)
-    label_order = Dict(l => i for (i, l) in enumerate(E.labels))
     starts = 1:nsplines:(E.ncols)
     # allocate up to maximum possible number of points
     basmat_ws = zeros(eltype(y), length(whichbin(0.0, E.δ):E.δ:whichbin(E.memory, E.δ)), nsplines)
     dest[:] .= zero(eltype(dest))
     if intercept
-        dest[1] = sum(w .* y)
-        dest = view(dest, 2, length(dest))
+        dest[1] = sum(W .* y)
+        dest_rest = view(dest, 2:length(dest))
     end
-    for (t, l) in events(E)
-        i = label_order[l]
+    for (t, i) in events(E)
         firstpoint = nextbinmid(t, E.δ)
         lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
         points = (firstpoint:E.δ:lastpoint) .- t
@@ -267,7 +261,7 @@ function XtWy!(dest, E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{
         relW = W[update_bins]
         rely = y[update_bins]
         update_vec = transpose(basmat_view) * (relW .* rely)
-        dest[starts[i]:(starts[i] +nsplines -1)] += update_vec
+        dest_rest[starts[i]:(starts[i] +nsplines -1)] += update_vec
     end
     return dest
 end
