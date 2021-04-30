@@ -273,7 +273,7 @@ end
 
 function XtWX!(dest, E, W)
     #stopgap no-op. Implement my bounded memory dequeue idea to avoid quadratic scaling in nspikes
-    return dest
+    return I(size(E)[2])
 end
 
 function XtWX!_old(dest, E, W)
