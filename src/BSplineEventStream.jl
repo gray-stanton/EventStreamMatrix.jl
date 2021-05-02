@@ -123,7 +123,7 @@ setindex!(G :: WeightedGramMatrix, I...) = @error "Not implemented"
 getindex(G :: WeightedGramMatrix, I...) = XtWX(G.X, G.W)[I[1], I[2]]
 
 function mul!(ws, G::WeightedGramMatrix, b :: Vector)
-    ws[:] = XtWXb(G.X, G.W, b)
+    XtWXb!(ws, G.X, G.W, b)
     #ws[:] = Matrix(G.X)' * diagm(G.W) * Matrix(G.X) * b
 end
 
@@ -243,7 +243,7 @@ function XtWy!(dest, E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{
         throw(DimensionMismatch())
     end
     nsplines = length(E.basis)
-    starts = 1:nsplines:(E.ncols)
+    starts = 1:nsplines:(E.ncols- convert(Int, E.intercept))
     # allocate up to maximum possible number of points
     basmat_ws = zeros(eltype(y), length(whichbin(0.0, E.δ):E.δ:whichbin(E.memory, E.δ)), nsplines)
     dest[:] .= zero(eltype(dest))
@@ -271,10 +271,85 @@ function XtWy(E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{T}) whe
     return XtWy!(dest, E, W, y)
 end
 
-function XtWX!(dest, E, W)
+function XtWX!(dest, E :: FirstOrderBSplineEventStreamMatrix, W)
     #stopgap no-op. Implement my bounded memory dequeue idea to avoid quadratic scaling in nspikes
-    return I(size(E)[2])
+    fill!(dest, zero(eltype(dest)))
+    if size(dest) != (E.ncols, E.ncols)
+        throw(DimensionMismatch())
+    elseif length(W) != E.nbins
+        throw(DimensionMismatch())
+    end
+    #break X into blocks of size nsplines
+    nsplines = length(E.basis)
+    δ = E.δ
+    starts = 1:nsplines:(E.ncols- convert(Int, E.intercept))
+    if E.intercept 
+        dest[1, 1] = sum(W)
+        dest_rest = view(dest, 2:size(dest)[1], 2:size(dest)[2])
+        # should have first row and first column be sum of w * basis values in those columns...
+    else
+        dest_rest = dest
+    end
+    exp_mats = Queue{Tuple{Float64, Int, Matrix{Float64}}}()
+    curevent_idx = 0
+    maxmemevent_idx = 0
+    while curevent_idx < length(E.events)
+        #Queue setup
+        curevent_idx += 1
+        # No more events to queue
+        newt, _ = E.events[curevent_idx]
+        for (t, j) in E.events[(maxmemevent_idx+1):end]
+            if t - newt < E.memory
+                firstpoint = nextbinmid(t, E.δ)
+                lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
+                enqueue!(exp_mats, (t, j, basismatrix(E.basis, (firstpoint:δ:lastpoint) .- t)))
+                maxmemevent_idx += 1
+            else
+                break
+            end
+        end
+
+        # Handle self Mult
+        t1, j1, fullb1 = dequeue!(exp_mats)
+        memstart_point = nextbinmid(t1, E.δ)
+        memend_point = min(prevbinmid(t1 + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
+        update_bins = whichbin(memstart_point, E.δ):1:whichbin(memend_point, E.δ)
+        b1 = view(fullb1, 1:length(update_bins), :)
+        update_cols1 = starts[j1]:(starts[j1]+nsplines - 1)
+        relW = Diagonal(W[update_bins])
+        dest_rest[update_cols1, update_cols1] += b1' * relW * b1
+        # Add intercept 
+        if E.intercept
+            intsum = sum(b1 .* W[update_bins]; dims=1)
+            dest[[1], update_cols1 .+ 1] += reshape(intsum, (1, length(update_cols1)))
+            dest[update_cols1 .+ 1, [1]] += reshape(intsum, (length(update_cols1), 1))
+        end
+        # Handle interaction with all other events in memory
+        for (t2, j2, b2) in exp_mats
+            interactstart_point = nextbinmid(t2, E.δ)
+            update_bins = whichbin(interactstart_point, E.δ):1:whichbin(memend_point, E.δ)
+            update_cols2 = starts[j2]:(starts[j2]+nsplines-1)
+            relW = Diagonal(W[update_bins])
+            relb1 = view(b1, (size(b1)[1]-length(update_bins)+1):size(b1)[1],:)
+            relb2 = view(b2, 1:length(update_bins), :)
+            update_mat1 = relb1' * relW * relb2
+            update_mat2 = transpose(update_mat1)
+            if j1 == j2
+                # Diagonal block of output
+                dest_rest[update_cols1, update_cols1] += update_mat1
+                dest_rest[update_cols1, update_cols1] += update_mat2
+            else
+                # Off-diagonal block of output
+                dest_rest[update_cols1, update_cols2] += update_mat1
+                dest_rest[update_cols2, update_cols1] += update_mat2
+            end
+        end
+        # Expand new matrices, add to queue
+    end
+    return dest
 end
+
+
 
 function XtWX!_old(dest, E, W)
     if size(dest) != (E.ncols, E.ncols)
@@ -330,11 +405,11 @@ function XtWX!_old(dest, E, W)
 end
 
 
-function XtWX(E:: FirstOrderBSplineEventStreamMatrix, W=ones(E.nbins))
-    out = zeros(Float64, E.ncols, E.ncols)
-    XtWX!(out, E, W)
-    return out
-end
+#function XtWX(E:: FirstOrderBSplineEventStreamMatrix, W=ones(E.nbins))
+#    out = zeros(Float64, E.ncols, E.ncols)
+#    XtWX!(out, E, W)
+#    return out
+#end
 
 function XtWXb!(dest, E :: FirstOrderBSplineEventStreamMatrix, W, b ::Vector{T}) where T
     # stopgap implementation as XtW(XB)

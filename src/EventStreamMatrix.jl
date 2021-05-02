@@ -23,6 +23,7 @@ import LinearAlgebra: mul!
 
 using LinearAlgebra
 using BSplines
+using DataStructures
 
 abstract type AbstractEventStreamMatrix{T, S} <: AbstractMatrix{T} end
 abstract type AbstractEventStreamVector{T} <: AbstractVector{T} end
