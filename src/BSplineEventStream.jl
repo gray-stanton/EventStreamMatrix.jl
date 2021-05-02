@@ -207,7 +207,8 @@ function XWb!(dest :: Vector{T}, E :: FirstOrderBSplineEventStreamMatrix{T}, W :
         throw(DimensionMismatch())
     end
     nsplines = length(E.basis)
-    fo_splines = [Spline(E.basis, W[k:k+nsplines-1].*b[k:(k+nsplines-1)])  for k in 2:nsplines:(E.ncols)]
+    spl_start = E.intercept ? 2 : 1
+    fo_splines = [Spline(E.basis, W[k:k+nsplines-1].*b[k:(k+nsplines-1)]) for k in spl_start:nsplines:(E.ncols)]
     bs_ws = zeros(eltype(b), order(E.basis))
     fill_val = intercept ? W[1] * b[1] : 0.0
     fill!(dest, fill_val)
