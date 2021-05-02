@@ -303,7 +303,8 @@ function XtWX!(dest, E :: FirstOrderBSplineEventStreamMatrix, W)
             if t - newt < E.memory
                 firstpoint = nextbinmid(t, E.δ)
                 lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
-                enqueue!(exp_mats, (t, j, basismatrix(E.basis, (firstpoint:δ:lastpoint) .- t)))
+                relW = W[whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)]
+                enqueue!(exp_mats, (t, j, basismatrix(E.basis, (firstpoint:δ:lastpoint) .- t) .* sqrt.(relW)))
                 maxmemevent_idx += 1
             else
                 break
@@ -317,36 +318,40 @@ function XtWX!(dest, E :: FirstOrderBSplineEventStreamMatrix, W)
         update_bins = whichbin(memstart_point, E.δ):1:whichbin(memend_point, E.δ)
         b1 = view(fullb1, 1:length(update_bins), :)
         update_cols1 = starts[j1]:(starts[j1]+nsplines - 1)
-        relW = Diagonal(W[update_bins])
-        dest_rest[update_cols1, update_cols1] += b1' * relW * b1
+        #relW = Diagonal(W[update_bins])
+        @views dest_rest[update_cols1, update_cols1] += (b1)' * b1
         # Add intercept 
         if E.intercept
-            intsum = sum(b1 .* W[update_bins]; dims=1)
-            dest[[1], update_cols1 .+ 1] += reshape(intsum, (1, length(update_cols1)))
-            dest[update_cols1 .+ 1, [1]] += reshape(intsum, (length(update_cols1), 1))
+            intsum = sum(b1 .* sqrt.(W[update_bins]); dims=1)
+            @views dest[[1], update_cols1 .+ 1] += reshape(intsum, (1, length(update_cols1)))
+            #dest[update_cols1 .+ 1, [1]] += reshape(intsum, (length(update_cols1), 1))
         end
         # Handle interaction with all other events in memory
         for (t2, j2, b2) in exp_mats
             interactstart_point = nextbinmid(t2, E.δ)
             update_bins = whichbin(interactstart_point, E.δ):1:whichbin(memend_point, E.δ)
             update_cols2 = starts[j2]:(starts[j2]+nsplines-1)
-            relW = Diagonal(W[update_bins])
+            #relW = Diagonal(W[update_bins])
             relb1 = view(b1, (size(b1)[1]-length(update_bins)+1):size(b1)[1],:)
             relb2 = view(b2, 1:length(update_bins), :)
-            update_mat1 = relb1' * relW * relb2
+            update_mat1 = relb1' * relb2
             update_mat2 = transpose(update_mat1)
             if j1 == j2
                 # Diagonal block of output
-                dest_rest[update_cols1, update_cols1] += update_mat1
-                dest_rest[update_cols1, update_cols1] += update_mat2
+                @inbounds @views dest_rest[update_cols1, update_cols1] += (update_mat1 + update_mat2)
+                #dest_rest[update_cols1, update_cols1] += update_mat2
             else
                 # Off-diagonal block of output
-                dest_rest[update_cols1, update_cols2] += update_mat1
-                dest_rest[update_cols2, update_cols1] += update_mat2
+                if first(update_cols1)<= first(update_cols2) # ut
+                   @inbounds @views dest_rest[update_cols1, update_cols2] += update_mat1
+                else
+                   @inbounds @views dest_rest[update_cols2, update_cols1] += update_mat2
+                end
             end
         end
         # Expand new matrices, add to queue
     end
+    copy!(dest, Symmetric(dest)) #UT
     return dest
 end
 
@@ -406,11 +411,11 @@ function XtWX!_old(dest, E, W)
 end
 
 
-#function XtWX(E:: FirstOrderBSplineEventStreamMatrix, W=ones(E.nbins))
-#    out = zeros(Float64, E.ncols, E.ncols)
-#    XtWX!(out, E, W)
-#    return out
-#end
+function XtWX(E:: FirstOrderBSplineEventStreamMatrix, W=ones(E.nbins))
+    out = zeros(Float64, E.ncols, E.ncols)
+    XtWX!(out, E, W)
+    return out
+end
 
 function XtWXb!(dest, E :: FirstOrderBSplineEventStreamMatrix, W, b ::Vector{T}) where T
     # stopgap implementation as XtW(XB)
