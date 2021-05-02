@@ -311,14 +311,21 @@ function XtWX!(dest, E :: FirstOrderBSplineEventStreamMatrix, W)
             if t - newt < E.memory
                 firstpoint = nextbinmid(t, E.δ)
                 lastpoint = min(prevbinmid(t + E.memory, E.δ), prevbinmid(E.maxtime, E.δ))
-                relW = W[whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)]
-                enqueue!(exp_mats, (t, j, basismatrix(E.basis, (firstpoint:δ:lastpoint) .- t) .* sqrt.(relW)))
+                points = firstpoint:E.δ:lastpoint
+                update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
+                if length(update_bins) != length(points)
+                    @warn "Possible floating point error in lengths"
+                    len = min(length(update_bins), length(points))
+                    update_bins=update_bins[1:len]
+                    points = points[1:len]
+                end
+                @views relW = W[update_bins]
+                enqueue!(exp_mats, (t, j, basismatrix(E.basis, (points .- t) .* sqrt.(relW))))
                 maxmemevent_idx += 1
             else
                 break
             end
         end
-
         # Handle self Mult
         t1, j1, fullb1 = dequeue!(exp_mats)
         memstart_point = nextbinmid(t1, E.δ)
