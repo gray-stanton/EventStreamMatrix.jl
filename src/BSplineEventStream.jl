@@ -190,7 +190,7 @@ function Matrix(E :: FirstOrderBSplineEventStreamMatrix)
             update_bins=update_bins[1:len]
             update_mat = [1:len, :] 
         end
-        out[update_bins, update_cols] += update_mat
+        @views @inbounds out[update_bins, update_cols] += update_mat
     end
     if E.intercept
         return hcat(ones(Float64, size(out)[1]), out)
