@@ -250,6 +250,7 @@ function XtWy!(dest, E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{
     # allocate up to maximum possible number of points
     basmat_ws = zeros(eltype(y), length(whichbin(0.0, E.δ):E.δ:whichbin(E.memory, E.δ)), nsplines)
     dest[:] .= zero(eltype(dest))
+    wy = W .* y
     if intercept
         dest[1] = sum(W .* y)
         dest_rest = view(dest, 2:length(dest))
@@ -261,9 +262,14 @@ function XtWy!(dest, E :: FirstOrderBSplineEventStreamMatrix{T}, W, y :: Vector{
         basmat_view = view(basmat_ws, 1:length(points), :)
         basismatrix!(basmat_view, E.basis, points)
         update_bins = whichbin(firstpoint, E.δ):1:whichbin(lastpoint, E.δ)
-        relW = W[update_bins]
-        rely = y[update_bins]
-        update_vec = transpose(basmat_view) * (relW .* rely)
+        if length(update_bins) != length(points)
+            @warn "Possible floating point error due to bin boundaries"
+            len = min(length(update_bins), length(points))
+            update_bins = update_bins[1:len]
+            basmat_view = view(basmat_ws, 1:len, :)
+        end
+        relWY = wy[update_bins]
+        update_vec = transpose(basmat_view) * relWY
         dest_rest[starts[i]:(starts[i] +nsplines -1)] += update_vec
     end
     return dest

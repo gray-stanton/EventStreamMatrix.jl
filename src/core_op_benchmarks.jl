@@ -59,6 +59,9 @@ function parse_commandline()
             nargs='+'
             arg_type=Float64
             default=[0.0, 0.4, 0.8]
+        "--skipdense"
+            help="Whether or not to skip all dense multiplies"
+            action=:store_true
     end
     return parse_args(s)
 end
@@ -109,37 +112,52 @@ function main()
                 dest1 = zeros(Float64, size(E)[1])
                 dest2 = zeros(Float64, size(E)[2])
                 dest3 = zeros(Float64, size(E)[2], size(E)[2])
-                X = Matrix(E)
-                S = sparse(X)
+                if !args["skipdense"]
+                    X = Matrix(E)
+                    S = sparse(X)
+                end
                 #XWb trials
                 println("XWb trials begin")
-                xwb_dense = @benchmark $X * $W2d * $b seconds=args["seconds"]
-                xwb_sparse = @benchmark $S * $W2d * $b seconds=args["seconds"]
+                if !args["skipdense"]
+                    xwb_dense = @benchmark $X * $W2d * $b seconds=args["seconds"]
+                    xwb_sparse = @benchmark $S * $W2d * $b seconds=args["seconds"]
+                end
                 xwb_event = @benchmark XWb!($dest1, $E, $W2, $b) seconds=args["seconds"]
 
                 #XtWy trials
                 println("XtWy trials begin")
-                xtwy_dense = @benchmark $X' * $W1d * $y seconds=args["seconds"]
-                xtwy_sparse = @benchmark $S' * $W1d * $y seconds=args["seconds"]
+                if !args["skipdense"]
+                    xtwy_dense = @benchmark $X' * $W1d * $y seconds=args["seconds"]
+                    xtwy_sparse = @benchmark $S' * $W1d * $y seconds=args["seconds"]
+                end
                 xtwy_event = @benchmark XtWy!($dest2, $E, $W1, $y) seconds=args["seconds"]
 
                 #XtWX trials
                 println("XtWX trials begin")
-                xtwx_dense = @benchmark $X' * $W1d * $X seconds=args["seconds"]
-                xtwx_sparse = @benchmark $S' * $W1d * $S seconds=args["seconds"]
+                if !args["skipdense"]
+                    xtwx_dense = @benchmark $X' * $W1d * $X seconds=args["seconds"]
+                    xtwx_sparse = @benchmark $S' * $W1d * $S seconds=args["seconds"]
+                end
                 xtwx_event = @benchmark XtWX!($dest3, $E, $W1) seconds=args["seconds"]
 
                 # XtWXb trials
                 println("XtWXb trials begin")
-                xtwxb_dense = @benchmark $X' * $W1d * $X * $b seconds=args["seconds"]
-                xtwxb_sparse = @benchmark $S' * $W1d * $S * $b seconds=args["seconds"]
+                if !args["skipdense"]
+                    xtwxb_dense = @benchmark $X' * $W1d * $X * $b seconds=args["seconds"]
+                    xtwxb_sparse = @benchmark $S' * $W1d * $S * $b seconds=args["seconds"]
+                end
                 xtwxb_event = @benchmark XtWXb!($dest2, $E, $W1, $b) seconds=args["seconds"]
-
-                names = ["xwb_dense", "xwb_sparse", "xwb_event", "xtwy_dense", "xtwy_sparse", "xtwy_event", "xtwx_dense",
-                        "xtwx_sparse", "xtwx_event", "xtwxb_dense", "xtwxb_sparse", "xtwxb_event"]
-                trials=[xwb_dense, xwb_sparse, xwb_event, xtwy_dense, xtwy_sparse, xtwy_event, xtwx_dense, 
-                        xtwx_sparse, xtwx_event, xtwxb_dense, xtwxb_sparse, xtwxb_event]
-                memsizes = repeat([Base.summarysize(X)/2^20, Base.summarysize(S)/2^20, Base.summarysize(E)/2^20], 4)
+                if !args["skipdense"]
+                    names = ["xwb_dense", "xwb_sparse", "xwb_event", "xtwy_dense", "xtwy_sparse", "xtwy_event", "xtwx_dense",
+                            "xtwx_sparse", "xtwx_event", "xtwxb_dense", "xtwxb_sparse", "xtwxb_event"]
+                    trials=[xwb_dense, xwb_sparse, xwb_event, xtwy_dense, xtwy_sparse, xtwy_event, xtwx_dense, 
+                            xtwx_sparse, xtwx_event, xtwxb_dense, xtwxb_sparse, xtwxb_event]
+                    memsizes = repeat([Base.summarysize(X)/2^20, Base.summarysize(S)/2^20, Base.summarysize(E)/2^20], 4)
+                else
+                    names = ["xwb_event", "xtwy_event", "xtwx_event", "xtwxb_event"]
+                    trials=[xwb_event, xtwy_event, xtwx_event, xtwxb_event]
+                    memsizes = repeat([Bas.summarysize(E)/2^20], 4)
+                end
                 trialnames = vcat(trialnames, names)
                 sizes = vcat(sizes, memsizes)
                 for (na,tr) in zip(names, trials)
@@ -151,9 +169,11 @@ function main()
                     push!(ts, t)
                     push!(ms, m)
                     push!(ns, n)
-                    push!(nrows, size(X)[1])
-                    push!(ncols, size(X)[2])
-                    push!(sparsity, nnz(S)/length(S))
+                    push!(nrows, size(E)[1])
+                    push!(ncols, size(E)[2])
+                    if !args["skipdense"]
+                        push!(sparsity, nnz(S)/length(S))
+                    end
                 end
             end
         end
