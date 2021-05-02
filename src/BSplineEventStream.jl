@@ -186,7 +186,7 @@ function Matrix(E :: FirstOrderBSplineEventStreamMatrix)
         update_cols = starts[i]:1:(starts[i]+length(E.basis)-1)
         if(length(update_bins) != length(points))
             @warn "Possible floating point error, due to events occuring exactly on bin boundary"
-            len = min(length(update_bins), length(update_cols))
+            len = min(length(update_bins), length(points))
             update_bins=update_bins[1:len]
             update_mat = [1:len, :] 
         end

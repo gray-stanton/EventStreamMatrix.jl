@@ -19,6 +19,11 @@ function parse_commandline()
             nargs='+'
             default=[100]
             arg_type=Int
+        "--mdensity"
+            nargs='+'
+            help="Density of events per source"
+            arg_type=Float64
+            default=Float64[]
         "-n"
             help="Number of sources"
             nargs='+'
@@ -70,7 +75,7 @@ function main()
     mems = Float64[]
     ts = Float64[]
     ns = Int[]
-    ms = Int[]
+    ms = Float64[]
     sizes = Float64[]
     nrows = Int[]
     ncols = Int[]
@@ -78,9 +83,18 @@ function main()
     trialnames = String[]
     for t in args["t"] 
         for n in args["n"]
-            for m in args["m"]
+            if length(args["mdensity"]) > 0
+                miter = args["mdensity"]
+            else 
+                miter = args["m"]
+            end
+            for m in miter
                 println("Begin t:$t n:$n m:$m")
-                eventtimes = t * rand(Float64, m * n)
+                if length(args["mdensity"]) > 0
+                    eventtimes = t * rand(Float64, ceil(Int, (m*t)*n))
+                else
+                    eventtimes = t * rand(Float64, m * n)
+                end
                 labels = ["s$i" for i in 1:n]
                 labs = repeat(1:n, floor(Int, length(eventtimes)/n))
                 eventstream = collect(zip(eventtimes, labs))
