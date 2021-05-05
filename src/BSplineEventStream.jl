@@ -122,9 +122,35 @@ Array(G :: WeightedGramMatrix) = Matrix(G)
 setindex!(G :: WeightedGramMatrix, I...) = @error "Not implemented"
 getindex(G :: WeightedGramMatrix, I...) = XtWX(G.X, G.W)[I[1], I[2]]
 
+
+struct WeightedNormGramMatrix{T} <: AbstractMatrix{T}
+    X :: Matrix{T}
+    W :: Vector{T}
+end
+
+size(G :: WeightedNormGramMatrix) = (size(G.X)[2], size(G.X)[2])
+Matrix(G:: WeightedNormGramMatrix) = G.X' * Diagonal(W) * G.X
+Array(G :: WeightedNormGramMatrix) = Matrix(G)
+setindex!(G :: WeightedNormGramMatrix, I...) = @error "not implemented"
+getindex(G :: WeightedNormGramMatrix, I...) = (G.X' * Diagonal(W) * G.X)[I[1], I[2]]
+
+
+
+size(G :: WeightedGramMatrix) = (G.X.ncols, G.X.ncols)
+Matrix(G :: WeightedGramMatrix) = XtWX(G.X, G.W)
+Array(G :: WeightedGramMatrix) = Matrix(G)
+setindex!(G :: WeightedGramMatrix, I...) = @error "Not implemented"
+getindex(G :: WeightedGramMatrix, I...) = XtWX(G.X, G.W)[I[1], I[2]]
+
+
+
 function mul!(ws, G::WeightedGramMatrix, b :: Vector)
     XtWXb!(ws, G.X, G.W, b)
     #ws[:] = Matrix(G.X)' * diagm(G.W) * Matrix(G.X) * b
+end
+
+function mul!(ws, G::WeightedNormGramMatrix, b :: vector)
+    mul!(ws, G.X' * Diagonal(G.W) * G.X, b)
 end
 
 function getindex(E :: FirstOrderBSplineEventStreamMatrix, I...)

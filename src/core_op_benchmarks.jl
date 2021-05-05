@@ -63,7 +63,10 @@ function parse_commandline()
             help="Whether or not to skip all dense multiplies"
             action=:store_true
         "--skipsparse"
-            help="Whether or not to skip all dense multiplies"
+            help="Whether or not to skip all sparse multiplies"
+            action=:store_true
+        "--skipxtx"
+            help="Whether or not to skip xtransposex"
             action=:store_true
     end
     return parse_args(s)
@@ -139,7 +142,7 @@ function main()
                 if !args["skipsparse"]
                     xtwy_sparse = @benchmark $S' * $W1d * $y seconds=args["seconds"]
                 end
-                xtwy_event = @benchmark XtWy!($dest2, $E, $W1, $y) seconds=args["seconds"]
+                    xtwy_event = @benchmark XtWy!($dest2, $E, $W1, $y) seconds=args["seconds"]
 
                 #XtWX trials
                 println("XtWX trials begin")
@@ -149,8 +152,12 @@ function main()
                 if !args["skipsparse"]
                     xtwx_sparse = @benchmark $S' * $W1d * $S seconds=args["seconds"]
                 end
-                xtwx_event = @benchmark XtWX!($dest3, $E, $W1) seconds=args["seconds"]
-
+                if args["skipxtx"]
+                    println("skipping...")
+                    xtwx_event = @benchmark sqrt(2)
+                else
+                    xtwx_event = @benchmark XtWX!($dest3, $E, $W1) seconds=args["seconds"]
+                end
                 # XtWXb trials
                 println("XtWXb trials begin")
                 if !args["skipdense"]
@@ -181,7 +188,7 @@ function main()
                 else
                     names = ["xwb_event", "xtwy_event", "xtwx_event", "xtwxb_event"]
                     trials=[xwb_event, xtwy_event, xtwx_event, xtwxb_event]
-                    memsizes = repeat([Bas.summarysize(E)/2^20], 4)
+                    memsizes = repeat([Base.summarysize(E)/2^20], 4)
                 end
                 trialnames = vcat(trialnames, names)
                 sizes = vcat(sizes, memsizes)
