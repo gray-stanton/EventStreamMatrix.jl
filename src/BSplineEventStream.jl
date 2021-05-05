@@ -129,10 +129,10 @@ struct WeightedNormGramMatrix{T} <: AbstractMatrix{T}
 end
 
 size(G :: WeightedNormGramMatrix) = (size(G.X)[2], size(G.X)[2])
-Matrix(G:: WeightedNormGramMatrix) = G.X' * Diagonal(W) * G.X
+Matrix(G:: WeightedNormGramMatrix) = G.X' * Diagonal(G.W) * G.X
 Array(G :: WeightedNormGramMatrix) = Matrix(G)
 setindex!(G :: WeightedNormGramMatrix, I...) = @error "not implemented"
-getindex(G :: WeightedNormGramMatrix, I...) = (G.X' * Diagonal(W) * G.X)[I[1], I[2]]
+getindex(G :: WeightedNormGramMatrix, I...) = (G.X' * Diagonal(G.W) * G.X)[I[1], I[2]]
 
 
 
@@ -149,7 +149,7 @@ function mul!(ws, G::WeightedGramMatrix, b :: Vector)
     #ws[:] = Matrix(G.X)' * diagm(G.W) * Matrix(G.X) * b
 end
 
-function mul!(ws, G::WeightedNormGramMatrix, b :: vector)
+function mul!(ws, G::WeightedNormGramMatrix, b :: Vector)
     mul!(ws, G.X' * Diagonal(G.W) * G.X, b)
 end
 

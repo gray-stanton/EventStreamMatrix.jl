@@ -12,6 +12,7 @@ export Matrix, Array, Vector
 export XtWX, XtWXb, XtWy, XWb
 export XWb!, XtWy!, XtWX!, XtWXb!
 export mul!
+export WeightedNormGramMatrix
 export FirstOrderDiscBSplineEventStreamMatrix
 export memorylengths_away
 
